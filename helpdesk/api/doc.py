@@ -11,6 +11,7 @@ from helpdesk.utils import (
     call_log_default_columns,
     check_permissions,
     contact_default_columns,
+    contact_default_rows,
     parse_call_logs,
 )
 
@@ -19,7 +20,7 @@ from helpdesk.utils import (
 def get_list_data(
     doctype: str,
     # flake8: noqa
-    filters: dict = {},
+    filters: dict | list = {},
     default_filters: dict = {},
     order_by: str = "modified desc",
     page_length: int = 20,
@@ -76,6 +77,7 @@ def get_list_data(
         if not default_view:
             if doctype == "Contact":
                 columns = contact_default_columns
+                rows = contact_default_rows
             elif doctype == "TP Call Log":
                 columns = call_log_default_columns
             elif hasattr(_list, "default_list_data"):
@@ -90,7 +92,12 @@ def get_list_data(
                 doctype, _list, show_customer_portal_fields
             )
             if default_filters and not filters:
-                filters.append(default_filters)
+                default_filters = frappe.parse_json(default_filters)
+                for key, value in (default_filters or {}).items():
+                    if isinstance(value, list):
+                        filters.append([key, value[0], value[1]])
+                    else:
+                        filters.append([key, "=", value])
 
     if rows is None:
         rows = []
@@ -106,6 +113,16 @@ def get_list_data(
     rows.append("name") if "name" not in rows else rows
     if doctype == "HD Ticket":
         rows.append("_seen") if "_seen" not in rows else rows
+
+    # Kanban cards surface counts (comments + attachments) in the card
+    # footer — fetch them as part of the list response so the renderer
+    # doesn't have to do per-row round trips. Both extras are harmless
+    # to fetch for non-kanban callers but we keep them gated to avoid
+    # any perceived perf hit on the list view's hot path.
+    extra_query_args = {}
+    if view_type == "kanban":
+        extra_query_args["with_comment_count"] = True
+
     data = (
         frappe.get_list(
             doctype,
@@ -113,9 +130,31 @@ def get_list_data(
             filters=filters,
             order_by=order_by,
             page_length=page_length,
+            **extra_query_args,
         )
         or []
     )
+
+    if view_type == "kanban" and data:
+        # File doctype has no native helper for "attached count" — one
+        # grouped query for the whole page is cheaper than a per-row
+        # `attached_files_count` and avoids N+1.
+        names = [d.get("name") for d in data if d.get("name")]
+        if names:
+            counts = frappe.db.sql(
+                """
+                SELECT attached_to_name AS doc, COUNT(*) AS c
+                FROM `tabFile`
+                WHERE attached_to_doctype = %(dt)s
+                  AND attached_to_name IN %(names)s
+                GROUP BY attached_to_name
+                """,
+                {"dt": doctype, "names": tuple(names)},
+                as_dict=True,
+            )
+            count_map = {row["doc"]: row["c"] for row in counts}
+            for d in data:
+                d["attachment_count"] = count_map.get(d.get("name"), 0)
 
     if doctype == "TP Call Log":
         data = parse_call_logs(data)
@@ -178,15 +217,34 @@ def get_list_data(
                 if not linked_dt:
                     return []
                 lookup_field = label_field or "name"
+                # Pull `color` from the linked doctype when it has one
+                # (e.g. HD Ticket Status) so kanban column headers match
+                # the colors used in the filter/status UI.
+                meta_dt = label_doc or linked_dt
+                meta = frappe.get_meta(meta_dt)
+                extra_fields = []
+                if meta.has_field("color"):
+                    extra_fields.append("color")
+                # `order` is a SQL reserved word — Frappe's QueryBuilder
+                # rejects it in order_by even with backticks — so fetch
+                # without SQL ordering and sort in Python below.
+                has_order = meta.has_field("order")
+                if has_order:
+                    extra_fields.append("order")
                 rows_ = frappe.get_all(
-                    label_doc or linked_dt,
-                    fields=["name", lookup_field],
-                    order_by=lookup_field,
+                    meta_dt,
+                    fields=["name", lookup_field, *extra_fields],
+                    order_by="name",
                 )
+                if has_order:
+                    rows_ = sorted(
+                        rows_, key=lambda r: (r.get("order") is None, r.get("order"))
+                    )
                 return [
                     {
                         "label": r.get(lookup_field) or r.get("name"),
                         "value": r.get("name"),
+                        **({"color": r.get("color")} if r.get("color") else {}),
                     }
                     for r in rows_
                 ]
@@ -296,6 +354,7 @@ def get_filterable_fields(
         "response_by",
         "resolution_by",
         "creation",
+        "customer",
     ]
 
     from_doc_fields = (
@@ -525,7 +584,7 @@ def handle_default_view(doctype, _list, show_customer_portal_fields):
     if not columns:
         if doctype == "Contact":
             columns = contact_default_columns
-            rows = ["name", "email_id", "creation"]
+            rows = ["name", "email_id", "mobile_no", "image", "creation"]
         elif doctype == "TP Call Log":
             columns = call_log_default_columns
             rows = ["name", "caller", "receiver", "creation"]
@@ -543,30 +602,39 @@ def handle_default_view(doctype, _list, show_customer_portal_fields):
 
 def handle_at_me_support(filters):
     # Converts @me in filters to current user
-    for key in filters:
-        value = filters[key]
-        if isinstance(value, list):
-            if "@me" in value:
-                value[value.index("@me")] = frappe.session.user
-            elif "%@me%" in value:
-                index = [i for i, v in enumerate(value) if v == "%@me%"]
-                for i in index:
-                    value[i] = "%" + frappe.session.user + "%"
-        elif value == "@me":
-            filters[key] = frappe.session.user
-
+    if isinstance(filters, dict):
+        for key in filters:
+            _replace_at_me(filters, key)
+        return filters
+    for condition in filters:
+        if isinstance(condition, list) and condition:
+            _replace_at_me(condition, len(condition) - 1)
     return filters
+
+
+def _replace_at_me(container, key):
+    value = container[key]
+    if isinstance(value, list):
+        if "@me" in value:
+            value[value.index("@me")] = frappe.session.user
+        elif "%@me%" in value:
+            index = [i for i, v in enumerate(value) if v == "%@me%"]
+            for i in index:
+                value[i] = "%" + frappe.session.user + "%"
+    elif value == "@me":
+        container[key] = frappe.session.user
+    elif value == "%@me%":
+        container[key] = "%" + frappe.session.user + "%"
 
 
 def handle_assigned_on_filter(filters, doctype):
     """
     Handle the custom __assigned_on filter by querying ToDo table
-    and returning ticket names that match the assignment date criteria.
+    and merging the matching ticket names into the filters in place.
     """
-    if "__assigned_on" not in filters:
-        return filters
-
-    assigned_on_filter = filters.pop("__assigned_on")
+    assigned_on_filter = _pop_assigned_on_filter(filters)
+    if assigned_on_filter is None:
+        return
 
     # Build ToDo query based on the operator and value
     ToDo = frappe.qb.DocType("ToDo")
@@ -583,20 +651,55 @@ def handle_assigned_on_filter(filters, doctype):
     query = apply_datetime_filter(query, ToDo.creation, assigned_on_filter)
 
     ticket_names = [row[0] for row in query.run()]
+    # No matching tickets results in an impossible filter
+    _merge_name_filter(filters, ticket_names)
 
-    if ticket_names:
-        # Merge with existing name filter if present
-        if "name" in filters:
+
+def _pop_assigned_on_filter(filters):
+    if isinstance(filters, dict):
+        if "__assigned_on" not in filters:
+            return None
+        return filters.pop("__assigned_on")
+    condition = next(
+        (
+            condition
+            for condition in filters
+            if isinstance(condition, list)
+            and condition
+            and condition[0] == "__assigned_on"
+        ),
+        None,
+    )
+    if condition is None:
+        return None
+    filters.remove(condition)
+    return [condition[1], condition[2]] if len(condition) >= 3 else None
+
+
+def _merge_name_filter(filters, ticket_names):
+    if isinstance(filters, dict):
+        if ticket_names and "name" in filters:
             existing_filter = filters["name"]
             if isinstance(existing_filter, list) and existing_filter[0] == "in":
                 # Intersection of both filters
                 ticket_names = list(set(ticket_names) & set(existing_filter[1]))
         filters["name"] = ["in", ticket_names]
+        return
+    existing = next(
+        (
+            condition
+            for condition in filters
+            if isinstance(condition, list)
+            and len(condition) >= 3
+            and condition[0] == "name"
+            and str(condition[1]).lower() == "in"
+        ),
+        None,
+    )
+    if existing:
+        existing[2] = list(set(ticket_names) & set(existing[2]))
     else:
-        # No matching tickets, add impossible filter
-        filters["name"] = ["in", []]
-
-    return filters
+        filters.append(["name", "in", ticket_names])
 
 
 def apply_datetime_filter(query, field, filter_value):

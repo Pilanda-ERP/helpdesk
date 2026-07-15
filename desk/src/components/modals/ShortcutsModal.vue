@@ -1,9 +1,6 @@
 <template>
-  <Dialog
-    v-model="open"
-    :options="{ title: __('Keyboard Shortcuts'), size: '4xl' }"
-  >
-    <template #body-content>
+  <Dialog v-model:open="open" :title="__('Keyboard Shortcuts')" size="4xl">
+    <template #default>
       <div class="w-full grid grid-cols-2 gap-10 py-1 shortcutsModal">
         <div
           v-for="group in shortcutGroups"
@@ -11,7 +8,7 @@
           class="pb-4"
           :class="!group.hideBorder && 'border-b border-outline-gray-2'"
         >
-          <h2 class="text-lg font-semibold text-ink-gray-9 mb-4">
+          <h2 class="text-lg-semibold text-ink-gray-9 mb-4">
             {{ group.title }}
           </h2>
           <ul class="space-y-2">
@@ -23,7 +20,7 @@
               <div class="text-ink-gray-7 text-base flex-1">
                 {{ shortcut.description }}
               </div>
-              <div class="flex space-x-1 gap-1 justify-end">
+              <div class="flex gap-1 justify-end">
                 <span
                   v-for="(key, kIndex) in shortcut.keys"
                   :key="kIndex"
@@ -123,7 +120,7 @@ onMounted(() => {
 </script>
 <style>
 /* Hack to remove focus ring from buttons in shortcuts modal */
-.bg-surface-modal:has(.shortcutsModal) button {
+.bg-surface-elevation-2:has(.shortcutsModal) button {
   @apply focus-visible:ring-0;
 }
 </style>

@@ -1,6 +1,6 @@
 <template>
   <div
-    class="flex select-none flex-col border-r border-outline-gray-modals bg-surface-menu-bar text-base duration-300 ease-in-out"
+    class="flex select-none flex-col border-e border-outline-elevation-2 bg-surface-sidebar text-base duration-300 ease-in-out"
     :style="{
       'min-width': width,
       'max-width': width,
@@ -27,7 +27,7 @@
     <div v-if="!isCustomerPortal">
       <div
         v-if="notificationStore.unread"
-        class="absolute size-1.5 translate-x-6 translate-y-1 rounded-full bg-blue-400 left-1"
+        class="absolute size-1.5 translate-x-6 rtl:-translate-x-6 translate-y-1 rounded-full bg-surface-blue-5 start-1"
         theme="gray"
         variant="solid"
       />
@@ -63,25 +63,28 @@
         /> -->
         <div :class="['mx-2', isCustomerPortal ? 'my-1' : 'my-2.5']"></div>
         <Section
-          :label="view.label"
+          :label="__(view.label)"
           :hideLabel="view.hideLabel"
           :opened="isSectionOpen(view.label, view.opened)"
         >
           <template #header="{ opened, hide }">
             <div
               v-if="!hide"
-              class="flex cursor-pointer gap-1.5 px-2 text-base mx-2 font-medium text-ink-gray-5 transition-all duration-300 ease-in-out"
+              class="flex cursor-pointer gap-1.5 px-2 text-base-medium mx-2 text-ink-gray-5 transition-all duration-300 ease-in-out"
               :class="
                 !isExpanded
-                  ? 'ml-0 h-0 overflow-hidden opacity-0'
-                  : 'pt-[11px] pb-2.5 w-auto opacity-100 '
+                  ? 'ms-0 h-0 overflow-hidden opacity-0'
+                  : 'pt-[11px] pb-2.5 w-auto opacity-100 rtl:flex-row-reverse rtl:justify-end'
               "
               @click="toggleSection(view.label, view.opened)"
             >
               <FeatherIcon
                 name="chevron-right"
                 class="h-4 text-ink-gray-9 transition-all duration-300 ease-in-out"
-                :class="{ 'rotate-90': isSectionOpen(view.label, view.opened) }"
+                :class="{
+                  'rotate-90': isSectionOpen(view.label, view.opened),
+                  'rtl:rotate-180': !isSectionOpen(view.label, view.opened),
+                }"
               />
               <span>{{ __(view.label) }}</span>
             </div>
@@ -104,7 +107,7 @@
     </div>
     <div class="grow" />
     <div class="flex flex-col gap-2 pb-2.5">
-      <div class="px-2">
+      <div class="px-2 flex flex-col gap-2">
         <TrialBanner
           v-if="isFCSite && !isCustomerPortal"
           :isSidebarCollapsed="!isExpanded"
@@ -113,6 +116,10 @@
           v-if="showOnboardingBanner"
           :isSidebarCollapsed="!isExpanded"
           appName="helpdesk"
+        />
+        <CustomerPortalPermissionBanner
+          v-if="showPermissionNoticeBanner"
+          :isSidebarCollapsed="!isExpanded"
         />
       </div>
 
@@ -130,7 +137,11 @@
       />
 
       <SidebarLink
-        :icon="isExpanded ? LucideArrowLeftFromLine : LucideArrowRightFromLine"
+        :icon="
+          isExpanded !== isRtl
+            ? LucideArrowLeftFromLine
+            : LucideArrowRightFromLine
+        "
         :is-active="false"
         :is-expanded="isExpanded"
         :label="isExpanded ? __('Collapse') : __('Expand')"
@@ -167,23 +178,25 @@
 <script setup lang="ts">
 import HDLogo from "@/assets/logos/HDLogo.vue";
 import { Section, SidebarLink } from "@/components";
-import Apps from "@/components/Apps.vue";
 import CP from "@/components/command-palette/CP.vue";
 import { FrappeCloudIcon, InviteCustomer } from "@/components/icons";
+import CustomerPortalPermissionBanner from "@/components/layouts/CustomerPortalPermissionBanner.vue";
 import ShortcutsModal from "@/components/modals/ShortcutsModal.vue";
 import SettingsModal from "@/components/Settings/SettingsModal.vue";
 import UserMenu from "@/components/UserMenu.vue";
+import { useApps } from "@/composables/useApps";
 import { useDevice } from "@/composables";
 import { confirmLoginToFrappeCloud } from "@/composables/fc";
 import { useScreenSize } from "@/composables/screen";
 import { currentView, useView } from "@/composables/useView";
-import { showNewContactModal } from "@/pages/desk/contact/dialogState";
+import { showNewContactModal } from "@/pages/contact/dialogState";
 import {
   showAssignmentModal,
   showCommentBox,
   showEmailBox,
 } from "@/pages/ticket/modalStates";
 import { useAuthStore } from "@/stores/auth";
+import { useConfigStore } from "@/stores/config";
 import { useNotificationStore } from "@/stores/notification";
 import { useSidebarStore } from "@/stores/sidebar";
 import { capture } from "@/telemetry";
@@ -217,12 +230,12 @@ import LucideBell from "~icons/lucide/bell";
 import FileText from "~icons/lucide/file-text";
 import Globe from "~icons/lucide/globe";
 import LucideKeyboard from "~icons/lucide/keyboard";
-import LucideMoon from "~icons/lucide/moon";
-import LucideSun from "~icons/lucide/sun";
 import LucideMail from "~icons/lucide/mail";
 import MailOpen from "~icons/lucide/mail-open";
 import MessageCircle from "~icons/lucide/message-circle";
+import LucideMoon from "~icons/lucide/moon";
 import LucideSearch from "~icons/lucide/search";
+import LucideSun from "~icons/lucide/sun";
 import Ticket from "~icons/lucide/ticket";
 import Timer from "~icons/lucide/timer";
 import UserPen from "~icons/lucide/user-pen";
@@ -234,10 +247,12 @@ import {
 } from "../Settings/settingsModal";
 
 const { isMobileView } = useScreenSize();
+const isRtl = document.documentElement.dir === "rtl";
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const configStore = useConfigStore();
 const notificationStore = useNotificationStore();
 const { isExpanded, width } = storeToRefs(useSidebarStore());
 const device = useDevice();
@@ -249,6 +264,7 @@ const showCommandPalette = ref(false);
 
 const { pinnedViews, publicViews } = useView();
 const { currentTheme, toggleTheme } = useTheme();
+const { appsMenuOption } = useApps();
 
 const themeMenuItem = computed(() => ({
   label: __("Toggle theme"),
@@ -334,7 +350,7 @@ const customerPortalDropdown = computed(() => [
     items: [
       {
         label: __("Log out"),
-        icon: "log-out",
+        icon: "lucide-log-out",
         onClick: () => authStore.logout(),
       },
     ],
@@ -342,24 +358,22 @@ const customerPortalDropdown = computed(() => [
 ]);
 
 const agentPortalDropdown = computed(() => [
-  {
-    component: markRaw(Apps),
-  },
+  appsMenuOption.value,
   {
     label: __("Customer portal"),
-    icon: "users",
+    icon: "lucide-users",
     onClick: () => {
       const path = router.resolve({ name: "TicketsCustomer" });
       window.open(path.href);
     },
   },
   {
-    icon: "life-buoy",
+    icon: "lucide-life-buoy",
     label: __("Support"),
     onClick: () => window.open("https://t.me/frappedesk"),
   },
   {
-    icon: "book-open",
+    icon: "lucide-book-open",
     label: __("Docs"),
     onClick: () => window.open("https://docs.frappe.io/helpdesk"),
   },
@@ -374,10 +388,9 @@ const agentPortalDropdown = computed(() => [
     icon: h(LucideKeyboard),
     onClick: () => (showShortcutsModal.value = true),
   },
-  themeMenuItem.value,
   {
     label: __("Settings"),
-    icon: "settings",
+    icon: "lucide-settings",
     onClick: () => (showSettingsModal.value = true),
   },
   {
@@ -386,7 +399,7 @@ const agentPortalDropdown = computed(() => [
     items: [
       {
         label: __("Log out"),
-        icon: "log-out",
+        icon: "lucide-log-out",
         onClick: () => authStore.logout(),
       },
     ],
@@ -423,6 +436,14 @@ const showOnboardingBanner = computed(() => {
     !isCustomerPortal.value &&
     !isOnboardingStepsCompleted.value &&
     authStore.isManager
+  );
+});
+
+const showPermissionNoticeBanner = computed(() => {
+  return (
+    !isCustomerPortal.value &&
+    (authStore.isManager || authStore.isAdmin) &&
+    configStore.showCustomerPortalPermissionNotice
   );
 });
 
@@ -560,77 +581,77 @@ const steps = [
 
 const articles = ref([
   {
-    title: "Introduction",
+    title: __("Introduction"),
     opened: false,
     subArticles: [
-      { name: "introduction", title: "Introduction" },
-      { name: "setting-up", title: "Setting up" },
+      { name: "introduction", title: __("Introduction") },
+      { name: "setting-up", title: __("Setting up") },
     ],
   },
   {
-    title: "Getting Started",
+    title: __("Getting Started"),
     opened: false,
     subArticles: [
       {
         name: "lesson-1-your-first-ticket",
-        title: "Creating a ticket",
+        title: __("Creating a ticket"),
       },
       {
         name: "lesson-2understanding-ticket-view",
-        title: "Understanding ticket view",
+        title: __("Understanding ticket view"),
       },
       {
         name: "lesson-3-agents-teams",
-        title: "Agents & Teams",
+        title: __("Agents & Teams"),
       },
       {
         name: "customers-contacts",
-        title: "Customers & Contacts",
+        title: __("Customers & Contacts"),
       },
       {
         name: "lesson-4-knowledge-base",
-        title: "Knowledge Base",
+        title: __("Knowledge Base"),
       },
       {
         name: "customer-portal",
-        title: "Customer Portal",
+        title: __("Customer Portal"),
       },
     ],
   },
   {
-    title: "Masters",
+    title: __("Masters"),
     opened: false,
     subArticles: [
-      { name: "ticket", title: "Ticket" },
-      { name: "agent", title: "Agent" },
-      { name: "team", title: "Team" },
-      { name: "contact", title: "Contact" },
-      { name: "customer", title: "Customer" },
-      { name: "knowledge-base", title: "Knowledge Base" },
-      { name: "saved-replies", title: "Saved Replies" },
-      { name: "service-level-agreement", title: "Service Level Agreement" },
-      { name: "ticket-type", title: "Ticket Type" },
-      { name: "ticket-priority", title: "Ticket Priority" },
+      { name: "ticket", title: __("Ticket") },
+      { name: "agent", title: __("Agent") },
+      { name: "team", title: __("Team") },
+      { name: "contact", title: __("Contact") },
+      { name: "customer", title: __("Customer") },
+      { name: "knowledge-base", title: __("Knowledge Base") },
+      { name: "saved-replies", title: __("Saved Replies") },
+      { name: "service-level-agreement", title: __("Service Level Agreement") },
+      { name: "ticket-type", title: __("Ticket Type") },
+      { name: "ticket-priority", title: __("Ticket Priority") },
     ],
   },
   {
-    title: "Customizations",
+    title: __("Customizations"),
     opened: false,
     subArticles: [
-      { name: "custom-actions", title: "Custom Actions" },
-      { name: "field-dependency", title: "Field Dependency" },
-      { name: "custom-views", title: "Custom Views" },
+      { name: "custom-actions", title: __("Custom Actions") },
+      { name: "field-dependency", title: __("Field Dependency") },
+      { name: "custom-views", title: __("Custom Views") },
       {
         name: "settings",
-        title: "Settings",
+        title: __("Settings"),
       },
     ],
   },
   {
-    title: "Frappe Helpdesk Mobile",
+    title: __("Frappe Helpdesk Mobile"),
     opened: false,
     subArticles: [
-      { name: "pwa-installation", title: "Mobile App Installation" },
+      { name: "pwa-installation", title: __("Mobile App Installation") },
     ],
   },
 ]);
@@ -647,7 +668,9 @@ async function handleFirstTicketNavigation() {
   if (!ticket) {
     router.push({ name: "TicketAgentNew" });
     updateOnboardingStep("create_first_ticket", false); // reset the step as first ticket is not created
-    toast.error("Please create a new ticket to proceed with the next step.");
+    toast.error(
+      __("Please create a new ticket to proceed with the next step.")
+    );
     return;
   }
 

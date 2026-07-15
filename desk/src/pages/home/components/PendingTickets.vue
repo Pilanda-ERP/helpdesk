@@ -1,9 +1,7 @@
 <template>
   <div class="flex flex-col rounded-md p-4 grow w-full h-full overflow-hidden">
     <div class="flex gap-4 items-center justify-between">
-      <div
-        class="flex items-center gap-2 text-lg font-semibold text-ink-gray-8"
-      >
+      <div class="flex items-center gap-2 text-lg-semibold text-ink-gray-8">
         {{ currentTitle }}
         <Tooltip :text="tooltipText" placement="top">
           <FeatherIcon name="info" class="size-3" />
@@ -22,22 +20,22 @@
       >
         <thead v-if="!showSkeleton && chartConfig?.tickets?.length > 0">
           <tr class="text-sm text-ink-gray-5">
-            <th class="p-2 text-left font-normal whitespace-nowrap">
+            <th class="p-2 text-start font-normal whitespace-nowrap">
               {{ __("ID") }}
             </th>
-            <th class="p-2 text-left font-normal w-full">
+            <th class="p-2 text-start font-normal w-full">
               {{ __("Subject") }}
             </th>
-            <th class="p-2 text-left font-normal min-w-20 whitespace-nowrap">
+            <th class="p-2 text-start font-normal min-w-20 whitespace-nowrap">
               {{ __("Status") }}
             </th>
-            <th class="p-2 text-left font-normal min-w-20 whitespace-nowrap">
+            <th class="p-2 text-start font-normal min-w-20 whitespace-nowrap">
               {{ __("Priority") }}
             </th>
-            <th class="p-2 text-left font-normal min-w-32 whitespace-nowrap">
+            <th class="p-2 text-start font-normal min-w-32 whitespace-nowrap">
               {{ __("Team") }}
             </th>
-            <th class="p-2 text-left font-normal min-w-40 whitespace-nowrap">
+            <th class="p-2 text-start font-normal min-w-40 whitespace-nowrap">
               {{ __("Reason") }}
             </th>
           </tr>
@@ -50,7 +48,7 @@
             v-for="ticket in chartConfig?.tickets"
             :key="ticket.name"
             @click="goToTicket(ticket)"
-            class="text-sm cursor-pointer hover:bg-surface-menu-bar border-t border-outline-gray-modals"
+            class="text-sm cursor-pointer hover:bg-surface-sidebar border-t border-outline-elevation-2"
           >
             <td class="p-2 py-3 whitespace-nowrap">{{ ticket.name }}</td>
             <td class="p-2 py-3 w-full max-w-0 truncate">
@@ -86,7 +84,7 @@
                   v-else-if="ticket.reason.type === 'pending'"
                   class="size-4 flex-shrink-0"
                 />
-                <span class="truncate pr-2">{{ ticket.reason.text }}</span>
+                <span class="truncate pe-2">{{ ticket.reason.text }}</span>
               </div>
               <span
                 v-else
@@ -100,7 +98,7 @@
           <tr
             v-for="i in 8"
             :key="i"
-            :class="i > 1 ? 'border-t border-outline-gray-modals' : ''"
+            :class="i > 1 ? 'border-t border-outline-elevation-2' : ''"
           >
             <td class="p-2 py-3 min-w-8">
               <div class="h-4 w-full rounded-sm bg-surface-gray-1" />
@@ -135,7 +133,7 @@
         </tbody>
       </table>
       <div
-        class="flex justify-between items-center text-sm mt-auto text-ink-gray-5 pl-2 pb-2"
+        class="flex justify-between items-center text-sm mt-auto text-ink-gray-5 ps-2 pb-2"
       >
         <div>
           <div
@@ -146,7 +144,7 @@
             {{
               __("See all {0} tickets", chartConfig?.totalPendingTickets + "")
             }}
-            <FeatherIcon name="arrow-right" class="size-4" />
+            <FeatherIcon name="arrow-right" class="size-4 rtl:rotate-180" />
           </div>
         </div>
         <div v-if="chartConfig?.tickets?.length > 0" class="mt-3 mb-0.5">
@@ -316,7 +314,7 @@ function getReasonColorClass(reason: {
   seconds_until_due?: number;
 }) {
   if (reason.text.includes("overdue")) {
-    return "text-ink-red-3";
+    return "text-ink-red-6";
   }
 
   if (
@@ -326,10 +324,10 @@ function getReasonColorClass(reason: {
     const oneHour = 3600;
     const twoHours = 7200;
     if (reason.seconds_until_due <= oneHour) {
-      return "text-ink-red-3";
+      return "text-ink-red-6";
     }
     if (reason.seconds_until_due <= twoHours) {
-      return "text-orange-500";
+      return "text-ink-orange-5";
     }
   }
   return "";

@@ -4,14 +4,14 @@
       <TransitionChild
         as="template"
         enter="transition ease-in-out duration-200 transform"
-        enter-from="-translate-x-full"
+        enter-from="-translate-x-full rtl:translate-x-full"
         enter-to="translate-x-0"
         leave="transition ease-in-out duration-200 transform"
         leave-from="translate-x-0"
-        leave-to="-translate-x-full"
+        leave-to="-translate-x-full rtl:translate-x-full"
       >
         <div
-          class="relative z-10 flex h-full w-[230px] flex-col border-r bg-surface-menu-bar transition-all duration-300 ease-in-out"
+          class="relative z-10 flex h-full w-[230px] flex-col border-e bg-surface-sidebar transition-all duration-300 ease-in-out"
         >
           <!-- user dropwdown -->
           <div class="p-1">
@@ -53,14 +53,17 @@
                 <template #header="{ opened, hide, toggle }">
                   <div
                     v-if="!hide"
-                    class="flex cursor-pointer gap-1.5 px-2 text-base font-medium text-ink-gray-5 mx-2 transition-all duration-300 ease-in-out"
-                    :class="'py-[7px] h-7.5 w-auto opacity-100'"
+                    class="flex cursor-pointer gap-1.5 px-2 text-base-medium text-ink-gray-5 mx-2 transition-all duration-300 ease-in-out"
+                    :class="'py-[7px] h-7.5 w-auto opacity-100 rtl:flex-row-reverse rtl:justify-end'"
                     @click="toggle()"
                   >
                     <FeatherIcon
                       name="chevron-right"
                       class="h-4 text-ink-gray-9 transition-all duration-300 ease-in-out"
-                      :class="{ 'rotate-90': opened }"
+                      :class="{
+                        'rotate-90': opened,
+                        'rtl:rotate-180': !opened,
+                      }"
                     />
                     <span>{{ view.label }}</span>
                   </div>
@@ -112,6 +115,7 @@ import { Section } from "@/components";
 import SidebarLink from "@/components/SidebarLink.vue";
 import UserMenu from "@/components/UserMenu.vue";
 import { useNotificationStore } from "@/stores/notification";
+import { __ } from "@/translation";
 
 import { mobileSidebarOpened as sidebarOpened } from "@/composables/mobile";
 import { currentView, useView } from "@/composables/useView";
@@ -121,9 +125,10 @@ import LucideMoon from "~icons/lucide/moon";
 import LucideSun from "~icons/lucide/sun";
 import { useTheme } from "frappe-ui";
 
+import { useApps } from "@/composables/useApps";
 import { useAuthStore } from "@/stores/auth";
 import { isCustomerPortal } from "@/utils";
-import Apps from "../Apps.vue";
+import AvailabilityMenuMobile from "../AvailabilityMenuMobile.vue";
 import {
   agentPortalSidebarOptions,
   customerPortalSidebarOptions,
@@ -132,9 +137,10 @@ import { useTelephonyStore } from "@/stores/telephony";
 import { storeToRefs } from "pinia";
 const { pinnedViews, publicViews } = useView();
 const { currentTheme, toggleTheme } = useTheme();
+const { appsMenuOption } = useApps();
 
 const themeMenuItem = computed(() => ({
-  label: "Toggle theme",
+  label: __("Toggle theme"),
   icon: currentTheme.value === "dark" ? LucideSun : LucideMoon,
   onClick: () => toggleTheme(),
 }));
@@ -203,38 +209,43 @@ function parseViews(views) {
 const customerPortalDropdown = computed(() => [
   themeMenuItem.value,
   {
-    label: "Log out",
-    icon: "log-out",
+    label: __("Log out"),
+    icon: "lucide-log-out",
     onClick: () => authStore.logout(),
   },
 ]);
 
 const agentPortalDropdown = computed(() => [
+  appsMenuOption.value,
+  ...(authStore.hasAgentRecord
+    ? [
+        {
+          component: markRaw(AvailabilityMenuMobile),
+        },
+      ]
+    : []),
   {
-    component: markRaw(Apps),
-  },
-  {
-    label: "Customer portal",
-    icon: "users",
+    label: __("Customer portal"),
+    icon: "lucide-users",
     onClick: () => {
       const path = router.resolve({ name: "TicketsCustomer" });
       window.open(path.href);
     },
   },
   {
-    icon: "life-buoy",
-    label: "Support",
+    icon: "lucide-life-buoy",
+    label: __("Support"),
     onClick: () => window.open("https://t.me/frappedesk"),
   },
   {
-    icon: "book-open",
-    label: "Docs",
+    icon: "lucide-book-open",
+    label: __("Docs"),
     onClick: () => window.open("https://docs.frappe.io/helpdesk"),
   },
   themeMenuItem.value,
   {
-    label: "Log out",
-    icon: "log-out",
+    label: __("Log out"),
+    icon: "lucide-log-out",
     onClick: () => authStore.logout(),
   },
 ]);

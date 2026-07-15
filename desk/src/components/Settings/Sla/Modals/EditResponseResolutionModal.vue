@@ -1,11 +1,6 @@
 <template>
-  <Dialog
-    v-model="dialog"
-    :options="{
-      title: 'Edit response and resolution',
-    }"
-  >
-    <template #body-content>
+  <Dialog v-model:open="dialog" title="Edit response and resolution">
+    <template #default>
       <div class="flex flex-col gap-4">
         <FormControl
           :type="'select'"
@@ -18,7 +13,7 @@
           required
         />
         <div>
-          <FormLabel label="Response time" required />
+          <FormLabel label="Response time" required size="md" />
           <Popover class="mt-2">
             <template #target="{ togglePopover }" class="w-max">
               <div
@@ -32,7 +27,7 @@
               </div>
             </template>
             <template #body>
-              <div class="absolute bg-surface-white top-2">
+              <div class="absolute bg-surface-base top-2">
                 <DurationPicker
                   v-model="priorityData.response_time"
                   :options="{ seconds: false }"
@@ -42,7 +37,7 @@
           </Popover>
         </div>
         <div>
-          <FormLabel label="Resolution time" required />
+          <FormLabel label="Resolution time" required size="md" />
           <Popover class="mt-2">
             <template #target="{ togglePopover }" class="w-max">
               <div
@@ -56,7 +51,7 @@
               </div>
             </template>
             <template #body>
-              <div class="absolute bg-surface-white top-2">
+              <div class="absolute bg-surface-base top-2">
                 <DurationPicker
                   v-model="priorityData.resolution_time"
                   :options="{ seconds: false }"
@@ -79,7 +74,7 @@
             :theme="isConfirmingDelete ? 'red' : 'gray'"
             :label="isConfirmingDelete ? 'Confirm Delete' : 'Delete'"
             @click="deleteItem"
-            icon-left="trash-2"
+            icon-left="lucide-trash-2"
           />
         </div>
         <div class="flex gap-2">

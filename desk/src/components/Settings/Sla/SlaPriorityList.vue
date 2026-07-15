@@ -12,14 +12,14 @@
         :key="column.key"
         class="text-ink-gray-5 overflow-hidden whitespace-nowrap text-ellipsis"
         :class="{
-          'ml-2':
+          'ms-2':
             column.key === 'priority' ||
             column.key === 'response_time' ||
             column.key === 'resolution_time',
         }"
       >
         {{ column.label }}
-        <span v-if="column.isRequired" class="text-ink-red-3">*</span>
+        <span v-if="column.isRequired" class="text-ink-red-6">*</span>
       </div>
     </div>
     <hr v-if="slaData.priorities?.length !== 0" />
@@ -51,7 +51,7 @@
         variant="subtle"
         label="Add row"
         @click="addRow"
-        icon-left="plus"
+        icon-left="lucide-plus"
       />
     </div>
     <ErrorMessage

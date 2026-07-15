@@ -37,7 +37,7 @@
       <UserAvatar :name="n.user_from" />
       <div>
         <div class="mb-2 leading-5">
-          <span class="space-x-1 text-ink-gray-7">
+          <span class="space-x-1 rtl:space-x-reverse text-ink-gray-7">
             <span class="font-medium text-ink-gray-9">{{ n.user_from }}</span>
             <span v-if="n.notification_type === 'Mention'">{{
               __("mentioned you in ticket")
@@ -57,25 +57,27 @@
           <div class="text-sm text-ink-gray-5">
             {{ dayjs.tz(n.creation).fromNow() }}
           </div>
-          <div v-if="!n.read" class="h-1.5 w-1.5 rounded-full bg-blue-400" />
+          <div
+            v-if="!n.read"
+            class="h-1.5 w-1.5 rounded-full bg-surface-blue-5"
+          />
         </div>
       </div>
     </RouterLink>
   </div>
   <div v-else class="flex flex-1 flex-col items-center gap-2">
     <LucideBell class="h-20 w-20 text-ink-gray-2" />
-    <div class="text-lg font-medium text-ink-gray-4">
+    <div class="text-lg-medium text-ink-gray-4">
       {{ __("No new notifications") }}
     </div>
   </div>
 </template>
 <script setup lang="ts">
-import { Breadcrumbs, Tooltip } from "frappe-ui";
+import { Breadcrumbs, dayjs, Tooltip } from "frappe-ui";
 import LayoutHeader from "@/components/LayoutHeader.vue";
 import { useNotificationStore } from "@/stores/notification";
 import { ref } from "vue";
 import { onClickOutside } from "@vueuse/core";
-import { dayjs } from "@/dayjs";
 import { Notification } from "@/types";
 import { UserAvatar } from "@/components";
 import LucideBell from "~icons/lucide/bell";

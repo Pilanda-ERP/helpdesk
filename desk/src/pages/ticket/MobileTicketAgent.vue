@@ -7,7 +7,7 @@
         </div>
       </template>
       <template #right-header>
-        <div class="absolute right-0 pr-2">
+        <div class="absolute end-0 pe-2">
           <Dropdown :options="dropdownOptions">
             <template #default="{ open }">
               <Button :label="ticket.doc.status">
@@ -72,12 +72,12 @@
                   :ticket="ticket.doc"
                 />
                 <!-- SLA Section -->
-                <h3 class="px-6 pt-3 font-semibold text-base">
+                <h3 class="px-6 pt-3 text-base-semibold">
                   {{ __("SLA") }}
                 </h3>
                 <TicketAgentDetails :ticket="ticket.doc" />
                 <!-- Ticket Fields -->
-                <h3 class="px-6 pt-3 font-semibold text-base">
+                <h3 class="px-6 pt-3 text-base-semibold">
                   {{ __("Details") }}
                 </h3>
                 <TicketAgentFields
@@ -107,7 +107,7 @@
             </template>
           </Tabs>
           <CommunicationArea
-            class="sticky bottom-0 z-50 bg-surface-white"
+            class="sticky bottom-0 z-50 bg-surface-base"
             ref="communicationAreaRef"
             v-model="ticket.doc"
             :ticketId="ticket.doc?.name"
@@ -127,11 +127,11 @@
       </div>
     </div>
 
-    <Dialog v-model="showSubjectDialog">
-      <template #body-title>
+    <Dialog v-model:open="showSubjectDialog">
+      <template #title>
         <h3>{{ __("Rename") }}</h3>
       </template>
-      <template #body-content>
+      <template #default>
         <FormControl
           v-model="subjectInput"
           :type="'text'"
@@ -155,7 +155,7 @@
         >
           {{ __("Confirm") }}
         </Button>
-        <Button class="ml-2" @click="showSubjectDialog = false">
+        <Button class="ms-2" @click="showSubjectDialog = false">
           {{ __("Close") }}
         </Button>
       </template>
@@ -214,7 +214,11 @@ import {
 } from "@/composables/formCustomisation";
 import { useScreenSize } from "@/composables/screen";
 import { useActiveTabManager } from "@/composables/useActiveTabManager";
-import { reloadTicket, useTicket } from "@/composables/useTicket";
+import {
+  reloadTicket,
+  revalidateTicket,
+  useTicket,
+} from "@/composables/useTicket";
 import { globalStore } from "@/stores/globalStore";
 import { getMeta } from "@/stores/meta";
 import { useTelephonyStore } from "@/stores/telephony";
@@ -613,6 +617,9 @@ function filterActivities(eventType: TicketTab) {
 
 onMounted(() => {
   document.title = props.ticketId;
+  // Revisiting a ticket: show the cached conversation immediately and refresh it
+  // in place (mobile has no live socket refresh to keep the cache current).
+  revalidateTicket(props.ticketId);
 });
 
 onUnmounted(() => {

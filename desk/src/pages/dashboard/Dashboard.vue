@@ -2,7 +2,7 @@
   <div class="flex flex-col">
     <LayoutHeader>
       <template #left-header>
-        <div class="text-lg font-medium text-ink-gray-9">
+        <div class="text-lg-medium text-ink-gray-9">
           {{ __(dashboardTitle) }}
         </div>
       </template>
@@ -30,7 +30,7 @@
               class="flex justify-between !min-w-48 items-center border border-outline-gray-2 rounded text-ink-gray-8 px-2 py-1.5 hover:border-outline-gray-3 hover:shadow-sm focus:border-outline-gray-4 focus:shadow-sm focus:ring-0 focus-visible:ring-0 transition-colors h-7 cursor-pointer"
             >
               <div class="flex items-center">
-                <LucideCalendar class="size-4 text-ink-gray-5 mr-2" />
+                <LucideCalendar class="size-4 text-ink-gray-5 me-2" />
                 <span class="text-base whitespace-nowrap">{{ preset }}</span>
               </div>
               <LucideChevronDown class="size-4 text-ink-gray-5" />
@@ -41,19 +41,13 @@
           v-else
           class="!w-48"
           ref="datePickerRef"
-          v-model="filters.period"
+          v-model="periodRange"
           variant="outline"
           :placeholder="__('Period')"
-          @update:model-value="
-            (e:string) => {
-              showDatePicker = false;
-              preset = formatter(e);
-            }
-          "
-          :formatter="formatRange"
+          :format="'MMM D'"
         >
           <template #prefix>
-            <LucideCalendar class="size-4 text-ink-gray-5 mr-2" />
+            <LucideCalendar class="size-4 text-ink-gray-5 me-2" />
           </template>
         </DateRangePicker>
         <Link
@@ -66,7 +60,7 @@
           :hide-me="true"
         >
           <template #prefix>
-            <LucideUsers class="size-4 text-ink-gray-5 mr-2" />
+            <LucideUsers class="size-4 text-ink-gray-5 me-2" />
           </template>
         </Link>
         <Link
@@ -80,7 +74,7 @@
           :hide-me="true"
         >
           <template #prefix>
-            <LucideUser class="size-4 text-ink-gray-5 mr-2" />
+            <LucideUser class="size-4 text-ink-gray-5 me-2" />
           </template>
         </Link>
       </div>
@@ -305,12 +299,12 @@ const tabButtons = computed(() => {
     {
       value: "organization",
       iconLeft: h(LucideBuilding2, { class: "size-4" }),
-      label: "My Organization",
+      label: __("My Organization"),
     },
     {
       value: "my_stats",
       iconLeft: h(LucideUser, { class: "size-4" }),
-      label: "My Stats",
+      label: __("My Stats"),
     },
   ];
 });
@@ -341,9 +335,11 @@ const parseFilters = (filters: Filters) => {
   };
 };
 
+// No `cache` key here: a static cache key makes frappe-ui return the same
+// resource instance across navigations, still bound to the previous mount's
+// `filters` closure, so reloads after navigating back send stale params.
 const numberCards = createResource({
   url: "helpdesk.api.dashboard.get_dashboard_data",
-  cache: ["Analytics", "NumberCards"],
   makeParams: () => ({
     dashboard_type: "number_card",
     filters: parseFilters(filters),
@@ -352,7 +348,6 @@ const numberCards = createResource({
 
 const masterData = createResource({
   url: "helpdesk.api.dashboard.get_dashboard_data",
-  cache: ["Analytics", "MasterCharts"],
   makeParams: () => ({
     dashboard_type: "master",
     filters: parseFilters(filters),
@@ -361,7 +356,6 @@ const masterData = createResource({
 
 const trendData = createResource({
   url: "helpdesk.api.dashboard.get_dashboard_data",
-  cache: ["Analytics", "TrendCharts"],
   makeParams: () => ({
     dashboard_type: "trend",
     filters: parseFilters(filters),
@@ -457,6 +451,17 @@ function getLastXDays(range: number = 30): string {
 const showDatePicker = ref(false);
 const datePickerRef = ref(null);
 const preset = ref(__("Last 30 Days"));
+
+// frappe-ui v1 DateRangePicker models a [from, to] tuple; filters.period and
+// the API keep the legacy "from,to" string, so convert at the picker boundary.
+const periodRange = computed({
+  get: (): string[] => (filters.period ? filters.period.split(",") : []),
+  set: (range: string[]) => {
+    showDatePicker.value = false;
+    filters.period = range?.length ? range.join(",") : "";
+    preset.value = formatter(filters.period);
+  },
+});
 
 const options = computed(() => [
   {
@@ -566,7 +571,7 @@ usePageMeta(() => {
 
 <style scoped>
 :deep(.form-control button) {
-  @apply text-base rounded h-7 py-1.5 border border-outline-gray-2 bg-surface-white placeholder-ink-gray-4 hover:border-outline-gray-3 hover:shadow-sm focus:bg-surface-white focus:border-outline-gray-4 focus:shadow-sm focus:ring-0 focus-visible:ring-0 text-ink-gray-8 transition-colors w-full dark:[color-scheme:dark];
+  @apply text-base rounded h-7 py-1.5 border border-outline-gray-2 bg-surface-base placeholder-ink-gray-4 hover:border-outline-gray-3 hover:shadow-sm focus:bg-surface-base focus:border-outline-gray-4 focus:shadow-sm focus:ring-0 focus-visible:ring-0 text-ink-gray-8 transition-colors w-full dark:[color-scheme:dark];
 }
 :deep(.form-control button > div) {
   overflow: hidden;
