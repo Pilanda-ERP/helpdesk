@@ -77,7 +77,7 @@
               :show-split-option="
                 !activity.isFirstEmail && ticketStatus !== 'Closed'
               "
-              class="py-2 px-3"
+              class="px-4 py-3"
               @reply="(e) => emit('email:reply', e)"
             />
             <CommentBox

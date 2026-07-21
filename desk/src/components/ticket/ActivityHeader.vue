@@ -26,6 +26,25 @@
         </Button>
       </template>
     </Dropdown>
+    <!-- LCS: Alle / Kommentare / Mails filter, shown on the conversation tab -->
+    <div
+      v-if="title == 'Konversation'"
+      class="inline-flex items-center gap-0.5 rounded-lg bg-surface-gray-2 p-0.5 text-sm font-normal"
+    >
+      <button
+        v-for="opt in conversationFilterOptions"
+        :key="opt.value"
+        class="rounded-md px-2.5 py-1 transition-colors"
+        :class="
+          conversationFilter === opt.value
+            ? 'bg-surface-white font-medium text-ink-gray-9 shadow-sm'
+            : 'text-ink-gray-6 hover:text-ink-gray-8'
+        "
+        @click="conversationFilter = opt.value"
+      >
+        {{ __(opt.label) }}
+      </button>
+    </div>
   </div>
   <CallLogModal
     v-model="showCallLogModal"
@@ -37,6 +56,7 @@
 <script setup lang="ts">
 import { PhoneIcon } from "@/components/icons";
 import CallLogModal from "@/pages/call-logs/CallLogModal.vue";
+import { conversationFilter } from "@/pages/ticket/modalStates";
 import { __ } from "@/translation";
 import { TicketSymbol } from "@/types";
 import { Dropdown } from "frappe-ui";
@@ -52,6 +72,12 @@ const makeCall = inject<() => void>("makeCall");
 const refreshTicket = inject<() => void>("refreshTicket");
 const showCallLogModal = ref(false);
 const ticket = inject(TicketSymbol)!;
+
+const conversationFilterOptions = [
+  { value: "alle", label: "Alle" },
+  { value: "comment", label: "Kommentare" },
+  { value: "email", label: "Mails" },
+] as const;
 
 const callActions = computed(() => {
   let actions = [

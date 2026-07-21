@@ -66,7 +66,6 @@ import IndicatorIcon from "@/components/icons/IndicatorIcon.vue";
 import BulkReplyModal from "@/components/ticket-agent/BulkReplyModal.vue";
 import ExportModal from "@/components/ticket/ExportModal.vue";
 import ViewBreadcrumbs from "@/components/ViewBreadcrumbs.vue";
-import { normalizeFilters } from "@/components/view-controls/filter";
 import ViewModal from "@/components/ViewModal.vue";
 import { currentView, useView } from "@/composables/useView";
 import { useAuthStore } from "@/stores/auth";
@@ -153,19 +152,19 @@ const options = computed(() => ({
       },
     },
     status: {
+      // LCS: render the status as a coloured chip (Badge) instead of a
+      // dot + text, using the HD Ticket Status colour.
       custom: ({ item }) => {
         const status = getStatus(item);
         const label = isCustomerPortal.value
           ? status?.["label_customer"]
           : status?.["label_agent"];
-        return h(
-          "div",
-          { class: "flex items-center gap-1.5 justify-start w-full" },
-          [
-            h(IndicatorIcon, { class: status?.["parsed_color"] }),
-            h("span", { class: "truncate flex-1 text-base" }, label),
-          ]
-        );
+        const theme = (status?.["color"] || "gray").toLowerCase();
+        return h(Badge, {
+          label: __(label || item),
+          theme,
+          variant: "subtle",
+        });
       },
     },
     agreement_status: {
@@ -297,25 +296,33 @@ async function exportRows(
   const fields = JSON.stringify(list.data.columns.map((f) => f.key));
   const order_by = list.params.order_by;
 
+  let filters = { ...list.params.filters };
   // Resolve `@me` filters to the current session user before export
-  const resolveAtMe = (entry: any) => {
-    if (Array.isArray(entry)) return entry.map(resolveAtMe);
-    if (entry === "@me") return userId;
-    if (entry === "%@me%") return `%${userId}%`;
-    return entry;
-  };
-  const conditions = normalizeFilters(list.params.filters).map(
-    ([field, operator, value]) => [field, operator, resolveAtMe(value)]
-  );
+  Object.keys(filters).forEach((key) => {
+    const value = filters[key];
+
+    // Handle direct filter format: { owner: "@me" }
+    if (value === "@me") {
+      filters[key] = userId;
+      return;
+    }
+    if (!Array.isArray(value)) return;
+
+    // Handle all operator-based filter format: { owner: ["=", "@me"], _assign: ["LIKE", "%@me%"] }
+    filters[key] = value.map((entry) =>
+      entry === "@me" ? userId : entry === "%@me%" ? `%${userId}%` : entry
+    );
+  });
   let pageLength: number;
 
   if (export_all) {
+    filters = JSON.stringify(filters);
     pageLength = list.data.total_count;
   } else {
     pageLength = listSelections.value.size;
-    conditions.push(["name", "in", Array.from(listSelections.value)]);
+    filters["name"] = ["in", Array.from(listSelections.value)];
+    filters = JSON.stringify(filters);
   }
-  const filters = JSON.stringify(conditions);
 
   window.location.href = `/api/method/frappe.desk.reportview.export_query?file_format_type=${export_type}&title=HD Ticket&doctype=HD Ticket&fields=${fields}&filters=${encodeURIComponent(
     filters

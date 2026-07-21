@@ -1,46 +1,54 @@
 <template>
-  <div class="flex-col text-base flex-1" ref="commentBoxRef">
-    <div class="mb-2 flex items-center justify-between">
-      <div class="text-ink-gray-5 flex items-center gap-2">
-        <Avatar
-          size="md"
-          :label="commenter"
-          :image="getUser(commentedBy).user_image"
-        />
-        <p>
-          <span class="font-medium text-ink-gray-8">
-            {{ commenter }}
-          </span>
-          <span> {{ __(" commented") }}</span>
-        </p>
-      </div>
-      <div class="flex items-center gap-1">
-        <Tooltip :text="dateFormat(creation, dateTooltipFormat)">
-          <span class="ps-0.5 text-sm text-ink-gray-5">
-            {{ timeAgo(creation) }}
-          </span>
-        </Tooltip>
-        <div v-if="authStore.userId === commentedBy && !editable">
-          <Dropdown
-            :placement="'right'"
-            :options="dropdownOptions"
-            @click="isConfirmingDelete = false"
-          >
-            <Button
-              icon="lucide-more-horizontal"
-              class="text-ink-gray-5"
-              variant="ghost"
-            />
-          </Dropdown>
-        </div>
-      </div>
-    </div>
+  <div class="flex flex-1 flex-col text-base" ref="commentBoxRef">
     <div
       :id="`comment-${name}`"
-      class="rounded-md bg-surface-gray-1 transition-colors px-3 py-1.5"
+      class="group relative grow overflow-hidden rounded-xl border border-surface-amber-2 bg-surface-amber-1 px-4 py-3 shadow-sm transition-all duration-200 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-surface-amber-6 before:content-['']"
       @keydown.ctrl.enter.capture.stop="handleSaveComment"
       @keydown.meta.enter.capture.stop="handleSaveComment"
     >
+      <!-- header: commenter + internal-note badge + time + actions -->
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex min-w-0 items-center gap-2">
+          <Avatar
+            size="sm"
+            :label="commenter"
+            :image="getUser(commentedBy).user_image"
+          />
+          <span class="truncate font-semibold text-ink-gray-9">{{
+            commenter
+          }}</span>
+          <Badge
+            :label="__('Interne Notiz')"
+            theme="orange"
+            variant="subtle"
+            size="sm"
+          />
+        </div>
+        <div class="flex shrink-0 items-center gap-1.5">
+          <Tooltip :text="dateFormat(creation, dateTooltipFormat)">
+            <span class="whitespace-nowrap text-xs text-ink-gray-5">
+              {{ timeAgo(creation) }}
+            </span>
+          </Tooltip>
+          <div
+            v-if="authStore.userId === commentedBy && !editable"
+            class="opacity-100 sm:opacity-0 sm:transition-opacity sm:duration-150 sm:group-hover:opacity-100"
+          >
+            <Dropdown
+              :placement="'right'"
+              :options="dropdownOptions"
+              @click="isConfirmingDelete = false"
+            >
+              <Button
+                icon="lucide-more-horizontal"
+                class="text-ink-gray-5"
+                variant="ghost"
+              />
+            </Dropdown>
+          </div>
+        </div>
+      </div>
+      <div class="my-2.5 border-t border-surface-amber-2" />
       <Editor v-model="_content" :extensions="extensions" :editable="editable">
         <template #default>
           <EditorBubbleMenu v-if="editable" :items="fullToolbar" />
@@ -67,7 +75,7 @@
         <Button label="Discard" @click="handleDiscard" />
       </div>
       <div
-        class="flex flex-wrap gap-2 mb-2"
+        class="mt-3 flex flex-wrap gap-2"
         v-if="!editable && Boolean(attachments.length)"
       >
         <AttachmentItem
@@ -163,6 +171,7 @@ import {
 import { buildEditorExtensions, fullToolbar } from "@/components/editor/config";
 import {
   Avatar,
+  Badge,
   Dropdown,
   Popover,
   Tooltip,

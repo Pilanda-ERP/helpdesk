@@ -55,6 +55,7 @@ import {
   EmailIcon,
   PhoneIcon,
 } from "@/components/icons";
+import { conversationFilter } from "@/pages/ticket/modalStates";
 import { useActiveTabManager } from "@/composables/useActiveTabManager";
 import { useTelephonyStore } from "@/stores/telephony";
 import {
@@ -82,28 +83,25 @@ const telephonyStore = useTelephonyStore();
 const { isCallingEnabled } = storeToRefs(telephonyStore);
 
 const tabs: ComputedRef<TabObject[]> = computed(() => {
+  // LCS: two tabs — the actual conversation (emails + comments, chat-style)
+  // and the system interactions (viewed, status set, assignment, …).
   const _tabs: TabObject[] = [
     {
-      name: "activity",
-      label: "Activity",
-      icon: ActivityIcon,
-    },
-    {
-      name: "email",
-      label: "Emails",
-      icon: EmailIcon,
-    },
-    {
-      name: "comment",
-      label: "Comments",
+      name: "konversation",
+      label: "Konversation",
       icon: CommentIcon,
+    },
+    {
+      name: "interaktionen",
+      label: "Interaktionen",
+      icon: ActivityIcon,
     },
   ];
 
   if (isCallingEnabled.value) {
     _tabs.push({
       name: "call",
-      label: "Calls",
+      label: "Anrufe",
       icon: PhoneIcon,
     });
   }
@@ -255,6 +253,24 @@ const _activities = computed(() => {
 });
 
 function filterActivities(eventType: TicketTab) {
+  // Konversation = the back-and-forth (emails + comments) plus the final
+  // feedback card. Interaktionen = system history (viewed, status, assign).
+  if (eventType === "konversation") {
+    const base = _activities.value.filter(
+      (a) => a.type === "email" || a.type === "comment" || a.type === "feedback"
+    );
+    // LCS: sub-filter driven by the Alle / Kommentare / Mails toggle.
+    if (conversationFilter.value === "comment") {
+      return base.filter((a) => a.type === "comment");
+    }
+    if (conversationFilter.value === "email") {
+      return base.filter((a) => a.type === "email" || a.type === "feedback");
+    }
+    return base;
+  }
+  if (eventType === "interaktionen") {
+    return _activities.value.filter((a) => a.type === "history");
+  }
   if (eventType === "activity") {
     return _activities.value;
   }

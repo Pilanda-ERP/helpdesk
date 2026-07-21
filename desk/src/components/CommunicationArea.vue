@@ -114,7 +114,7 @@ import { useScreenSize } from "@/composables/screen";
 import { useShortcut } from "@/composables/shortcuts";
 import { showCommentBox, showEmailBox } from "@/pages/ticket/modalStates";
 import { onClickOutside } from "@vueuse/core";
-import { ref, watch } from "vue";
+import { nextTick, onMounted, ref, watch } from "vue";
 
 const emit = defineEmits(["update"]);
 const content = defineModel("content");
@@ -211,6 +211,17 @@ watch(
     }
   }
 );
+
+// LCS: default to the comment box, opened + focused, so an agent can
+// start typing immediately. The component is keyed per ticket, so this
+// re-runs whenever a different ticket is opened.
+onMounted(() => {
+  showEmailBox.value = false;
+  showCommentBox.value = true;
+  nextTick(() => {
+    commentTextEditorRef.value?.editor?.commands?.focus();
+  });
+});
 
 useShortcut("r", () => {
   toggleEmailBox();

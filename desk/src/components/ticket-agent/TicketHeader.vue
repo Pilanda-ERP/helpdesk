@@ -11,7 +11,7 @@
             />
           </template>
         </Breadcrumbs>
-        <TicketSLA />
+        <!-- LCS: First Response / Resolution (TicketSLA) removed per review -->
       </div>
     </template>
     <template #right-header>
@@ -45,20 +45,7 @@
             </Dropdown>
           </div>
         </div>
-        <!-- Status -->
-        <Dropdown :options="statusDropdown" placement="right">
-          <template #default="{ open }">
-            <Button :label="__(ticket.doc.status)" ref="statusRef">
-              <template #prefix>
-                <IndicatorIcon
-                  :class="
-                    ticketStatusStore.getStatus(ticket.doc.status)?.parsed_color
-                  "
-                />
-              </template>
-            </Button>
-          </template>
-        </Dropdown>
+        <!-- LCS: Status moved to the right sidebar (Details) — removed here -->
         <!-- Core Actions + Custom Actions -->
         <Dropdown
           v-if="groupedActions[0]?.items?.length >= 1"
@@ -211,7 +198,8 @@ function handleDeleteTicket() {
         iconLeft: "trash-2",
         variant: "solid",
         onClick({ close }) {
-          call("helpdesk.api.ticket.delete_ticket", {
+          call("frappe.client.delete", {
+            doctype: "HD Ticket",
             name: ticket?.value?.doc.name,
           })
             .then(() => {

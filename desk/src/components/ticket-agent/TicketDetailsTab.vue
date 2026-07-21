@@ -21,10 +21,10 @@
               :id="field.fieldname"
               :class="section.group ? 'flex-1 min-w-0' : 'w-full'"
               :page-length="10"
-              :label="__(field.label)"
-              :placeholder="__(field.placeholder)"
+              :label="field.label"
+              :placeholder="field.placeholder"
               :doctype="field.doctype"
-              :modelValue="__(field.value)"
+              :modelValue="field.value"
               :required="field.required"
               @update:model-value="
               (val:string) => handleFieldUpdate(field.fieldname, val,true)
@@ -45,14 +45,14 @@
     >
       <!-- Ticket Info (custom fields) -->
       <div v-if="Boolean(customFields.length)">
-        <Section label="Ticket Info" v-model:opened="openedSections.ticketInfo">
+        <Section label="Weitere Details" :opened="true">
           <template #header="{ opened, toggle }">
             <div
               class="flex gap-2.5 items-center justify-between sticky top-0 bg-surface-base z-10 px-4 py-4 cursor-pointer"
               @click="toggle"
             >
-              <span class="text-ink-gray-8 text-base-semibold select-none">
-                {{ __("Ticket Info") }}
+              <span class="text-ink-gray-8 font-semibold text-base select-none">
+                {{ __("Weitere Details") }}
               </span>
               <LucideChevronRight
                 class="size-4 text-ink-gray-6"
@@ -85,7 +85,7 @@
           <Section
             :label="section.label"
             :hideLabel="section.hideLabel"
-            v-model:opened="openedSections[section.key]"
+            :opened="section.opened"
           >
             <template #header="{ opened, toggle }">
               <div
@@ -93,7 +93,9 @@
                 @click="toggle"
               >
                 <Tooltip :text="section.tooltipMessage">
-                  <span class="text-ink-gray-8 text-base-semibold select-none">
+                  <span
+                    class="text-ink-gray-8 font-semibold text-base select-none"
+                  >
                     {{ __(section.label) }}
                   </span>
                 </Tooltip>
@@ -103,7 +105,7 @@
                 />
               </div>
             </template>
-            <ul class="pt-0 px-4 divide-y divide-outline-gray-1 pb-4">
+            <ul class="pt-0 px-5 divide-y divide-outline-gray-1 pb-4">
               <li
                 v-for="t in section.tickets"
                 :key="t.name"
@@ -152,8 +154,8 @@ import {
   RecentSimilarTicketsSymbol,
   TicketSymbol,
 } from "@/types";
-import { useStorage } from "@vueuse/core";
-import { dayjs, Tooltip } from "frappe-ui";
+import dayjs from "dayjs";
+import { Tooltip } from "frappe-ui";
 import { computed, inject, ref } from "vue";
 import LucideChevronRight from "~icons/lucide/chevron-right";
 import Section from "../Section.vue";
@@ -172,16 +174,15 @@ const { notifyTicketUpdate } = useNotifyTicketUpdate(ticket.value?.name);
 const dateFormat = window.date_format;
 const { getStatus, colorMap } = useTicketStatusStore();
 
-// ticket_type, priority, customer, agent_group
+// LCS core fields: Priorität, Status, Team — all editable Link fields.
+// Status is set here (sidebar) instead of the top-right header.
 const coreFields = computed(() => {
-  // TODO: to confirm whether customizations should apply to core fields as well
   const fieldsMeta = getFields();
   if (!fieldsMeta || fieldsMeta.length === 0) {
     return [];
   }
   const _coreFields = [
-    { group: true, fields: [getField("ticket_type"), getField("priority")] },
-    { group: false, fields: [getField("customer")] },
+    { group: true, fields: [getField("priority"), getField("status")] },
     { group: true, fields: [getField("agent_group")] },
   ];
 
@@ -201,6 +202,28 @@ const coreFields = computed(() => {
   return _coreFields;
 });
 
+// "Weitere Details" per category — only the fields relevant to the
+// ticket's LCS category are shown (not every custom field).
+const CATEGORY_FIELDS: Record<string, string[]> = {
+  Idee: [
+    "custom_idee_typ",
+    "custom_geschaetzter_nutzen",
+    "custom_betroffene_bereiche",
+    "custom_schwerpunkt_themen",
+  ],
+  Problem: ["custom_fachbereich", "custom_kunde_betroffen", "custom_kundenname"],
+  Notfall: ["custom_notfall_art", "custom_standort"],
+  Kunde: [
+    "custom_anliegen_art",
+    "custom_kunde_firma",
+    "custom_ansprechpartner",
+    "custom_meldender_kontakt",
+    "custom_projektnummer",
+    "custom_fachbereich",
+    "custom_eingangskanal",
+  ],
+};
+
 const customFields = computed(() => {
   const fieldsMeta = getFields();
   if (!fieldsMeta || fieldsMeta.length === 0) {
@@ -218,6 +241,17 @@ const customFields = computed(() => {
     "status",
   ];
   customFields = customFields.filter((f) => !_coreFields.includes(f.fieldname));
+
+  // Category-specific whitelist; fall back to all when unknown.
+  const kat = ticket.value.doc?.custom_lcs_kategorie as string;
+  const allowed = CATEGORY_FIELDS[kat];
+  if (allowed) {
+    customFields = customFields
+      .filter((f) => allowed.includes(f.fieldname))
+      .sort(
+        (a, b) => allowed.indexOf(a.fieldname) - allowed.indexOf(b.fieldname)
+      );
+  }
   let _customFields = customFields
     .map((f) => {
       let fieldMeta = getField(f.fieldname);
@@ -233,17 +267,6 @@ const customFields = computed(() => {
   return _customFields;
 });
 
-const openedSections = useStorage(
-  "openedSections",
-  {
-    ticketInfo: false,
-    recentTickets: false,
-    similarTickets: false,
-  },
-  localStorage,
-  { mergeDefaults: true }
-);
-
 const sections = computed(() => {
   if (recentSimilarTickets.value.loading || !recentSimilarTickets.value.data) {
     return [];
@@ -254,19 +277,19 @@ const sections = computed(() => {
   const _sections = [];
   if (recentTickets.length) {
     _sections.push({
-      key: "recentTickets" as const,
       label: "Recent Tickets",
       tooltipMessage: "Tickets recently raised by this contact/customer",
       hideLabel: false,
+      opened: true,
       tickets: recentTickets,
     });
   }
   if (similarTickets.length) {
     _sections.push({
-      key: "similarTickets" as const,
       label: "Similar Tickets",
       tooltipMessage: "Tickets with similar queries",
       hideLabel: false,
+      opened: true,
       tickets: similarTickets,
     });
   }
@@ -274,7 +297,7 @@ const sections = computed(() => {
 });
 
 function getStatusColor(status: string) {
-  const { color } = getStatus(status) ?? {};
+  let { color } = getStatus(status);
   return colorMap[color] ?? colorMap["Default"];
 }
 
@@ -346,13 +369,8 @@ const setFieldRef = (fieldname: string, el: any) => {
   }
 };
 
-const showRecentSimilarTickets = computed(() => {
-  return (
-    !recentSimilarTickets.value.loading &&
-    (recentSimilarTickets.value?.data?.recent_tickets?.length ||
-      recentSimilarTickets.value?.data?.similar_tickets?.length)
-  );
-});
+// LCS: Recent / Similar Tickets removed from the sidebar per review.
+const showRecentSimilarTickets = computed(() => false);
 
 useShortcut("t", () => {
   fieldRefs.value?.ticket_type?.$el?.querySelector("button")?.click();

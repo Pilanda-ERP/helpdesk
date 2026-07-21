@@ -138,6 +138,12 @@ const htmlContent = computed(
     <link rel="stylesheet" href="${cssHref.value}" />
     <base target="_blank" />
     <style>
+      /* Let the surrounding message card colour show through the iframe
+         instead of the browser's default white canvas. */
+      html,
+      body {
+        background: transparent;
+      }
       :root {
         --bg-surface-gray-3: #ededed;
         --bg-surface-gray-4: #e2e2e2;

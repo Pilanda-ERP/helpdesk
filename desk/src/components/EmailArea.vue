@@ -2,7 +2,8 @@
   <div
     :id="`communication-${name}`"
     v-bind="$attrs"
-    class="grow cursor-pointer bg-surface-base rounded-md text-base leading-6 transition-all duration-300 ease-in-out border border-outline-gray-2"
+    class="group relative grow cursor-pointer overflow-hidden rounded-xl border text-base leading-6 shadow-sm transition-all duration-200 before:absolute before:inset-y-0 before:left-0 before:w-1 before:content-['']"
+    :class="roleAccent"
   >
     <div
       class="flex items-center justify-between gap-2"
@@ -23,34 +24,43 @@
         </div>
       </div>
       <!-- email design for desktop -->
-      <div v-else class="flex items-center gap-1">
-        <span>{{ sender.full_name || "Guest" }}</span>
+      <div v-else class="flex min-w-0 items-center gap-2">
+        <span class="truncate font-semibold text-ink-gray-9">{{
+          sender.full_name || "Guest"
+        }}</span>
+        <Badge
+          :label="isEndUser ? __('Melder') : __('Agent')"
+          :theme="isEndUser ? 'gray' : 'blue'"
+          variant="subtle"
+          size="sm"
+        />
         <span
-          class="sm:flex hidden text-sm text-ink-gray-5"
+          class="hidden truncate text-sm text-ink-gray-5 sm:inline"
           v-if="sender.name"
-          >{{ "<" + sender.name + ">" }}</span
+          >{{ sender.name }}</span
         >
       </div>
 
-      <div class="flex gap-2 items-center">
-        <div class="gap-0.5 flex items-center">
+      <div class="flex shrink-0 items-center gap-1.5">
+        <div class="flex items-center gap-1">
           <Badge
             v-if="status.label && !ticket?.doc?.via_customer_portal"
             :label="__(status.label)"
             variant="subtle"
             :theme="status.color"
-            class="me-1.5"
           />
           <Tooltip
             :text="dateFormat(creation, dateTooltipFormat)"
             v-if="!isMobileView"
           >
-            <p class="text-xs md:text-sm text-ink-gray-5">
+            <span class="whitespace-nowrap text-xs text-ink-gray-5">
               {{ timeAgo(creation) }}
-            </p>
+            </span>
           </Tooltip>
         </div>
-        <div class="flex items-center gap-1">
+        <div
+          class="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:duration-150 sm:focus-within:opacity-100 sm:group-hover:opacity-100"
+        >
           <Button :tooltip="__('Reply')" variant="ghost" @click="reply">
             <template #icon>
               <ReplyIcon class="text-ink-gray-7" />
@@ -84,7 +94,7 @@
     <!-- <div class="text-sm leading-5 text-ink-gray-5">
       {{ subject }}
     </div> -->
-    <div class="text-p-sm text-ink-gray-5">
+    <div class="mt-0.5 text-xs text-ink-gray-5">
       <template
         v-for="(val, label) in { To: to, cc: cc, bcc: bcc }"
         :key="label"
@@ -95,9 +105,12 @@
         </span>
       </template>
     </div>
-    <div class="border-0 border-t my-3 border-outline-elevation-2 !-mx-3" />
+    <div class="my-2.5 border-t border-outline-gray-2" />
     <EmailContent :content="content" />
-    <div class="flex flex-wrap gap-2">
+    <div
+      v-if="attachments?.length"
+      class="mt-3 flex flex-wrap gap-2"
+    >
       <AttachmentItem
         v-for="a in attachments"
         :key="a.file_url"
@@ -152,6 +165,19 @@ const {
 
 const emit = defineEmits(["reply"]);
 const ticket = inject(TicketSymbol)!;
+
+// LCS chat cue: the reporter (raised_by) is the end user; any other
+// sender is an agent. A soft role-tinted card makes agent vs end user
+// obvious without a heavy left/right chat re-layout.
+const isEndUser = computed(() => {
+  const raisedBy = ticket?.value?.doc?.raised_by;
+  return Boolean(raisedBy && sender?.name === raisedBy);
+});
+const roleAccent = computed(() =>
+  isEndUser.value
+    ? "bg-surface-white border-outline-gray-2 before:bg-gray-300"
+    : "bg-surface-blue-1 border-blue-200 before:bg-blue-500"
+);
 
 const auth = storeToRefs(useAuthStore());
 
