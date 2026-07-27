@@ -3,23 +3,35 @@
     <div class="shrink-0 px-4 pb-4 flex flex-col">
       <!-- User avatar with buttons -->
       <TicketContact />
-      <!-- Core Fields -->
+      <!-- Core Fields — LCS order: Kategorie, Priorität, Status,
+           Gemeldet von, Kontakt, Gemeldet am, Team, Bearbeiter -->
       <div class="mt-4">
-        <div
-          v-for="(section, index) in coreFields"
-          :key="index"
-          :class="
-            section.group ? 'flex gap-2 items-start max-w-full mb-3' : 'mb-3'
-          "
-        >
-          <template v-for="field in section.fields">
+        <template v-for="row in coreRows" :key="row.key">
+          <!-- read-only info row -->
+          <div
+            v-if="row.type === 'info'"
+            class="flex items-center justify-between gap-2 py-1.5"
+          >
+            <span class="text-xs text-ink-gray-5 shrink-0">{{
+              __(row.label)
+            }}</span>
+            <span
+              class="text-sm text-ink-gray-8 text-right truncate min-w-0"
+              :title="String(row.value)"
+              >{{ row.value }}</span
+            >
+          </div>
+          <!-- Priorität + Status side by side -->
+          <div
+            v-else-if="row.type === 'linkgroup'"
+            class="flex gap-2 items-start max-w-full mb-3 mt-1.5"
+          >
             <Link
-              v-if="field.visible"
+              v-for="field in row.fields"
               :key="field.fieldname"
               :ref="(el) => setFieldRef(field.fieldname, el)"
-              class="form-control-core"
+              class="form-control-core flex-1 min-w-0"
               :id="field.fieldname"
-              :class="section.group ? 'flex-1 min-w-0' : 'w-full'"
               :page-length="10"
               :label="field.label"
               :placeholder="field.placeholder"
@@ -27,13 +39,30 @@
               :modelValue="field.value"
               :required="field.required"
               @update:model-value="
-              (val:string) => handleFieldUpdate(field.fieldname, val,true)
-            "
+                (val:string) => handleFieldUpdate(field.fieldname, val, true)
+              "
             />
-          </template>
-        </div>
+          </div>
+          <!-- Team (single editable link) -->
+          <div v-else-if="row.type === 'link' && row.field" class="mb-3 mt-1.5">
+            <Link
+              :ref="(el) => setFieldRef(row.field.fieldname, el)"
+              class="form-control-core w-full"
+              :id="row.field.fieldname"
+              :page-length="10"
+              :label="row.field.label"
+              :placeholder="row.field.placeholder"
+              :doctype="row.field.doctype"
+              :modelValue="row.field.value"
+              :required="row.field.required"
+              @update:model-value="
+                (val:string) => handleFieldUpdate(row.field.fieldname, val, true)
+              "
+            />
+          </div>
+        </template>
 
-        <!-- Assignee component -->
+        <!-- Bearbeiter -->
         <AssignTo />
       </div>
     </div>
@@ -174,32 +203,38 @@ const { notifyTicketUpdate } = useNotifyTicketUpdate(ticket.value?.name);
 const dateFormat = window.date_format;
 const { getStatus, colorMap } = useTicketStatusStore();
 
-// LCS core fields: Priorität, Status, Team — all editable Link fields.
-// Status is set here (sidebar) instead of the top-right header.
-const coreFields = computed(() => {
-  const fieldsMeta = getFields();
-  if (!fieldsMeta || fieldsMeta.length === 0) {
-    return [];
-  }
-  const _coreFields = [
-    { group: true, fields: [getField("priority"), getField("status")] },
-    { group: true, fields: [getField("agent_group")] },
-  ];
-
-  _coreFields.forEach((section) => {
-    section.fields = section.fields.map((f) => {
-      f = parseField(f, ticket.value.doc);
-
-      // cant handle required depends on as we directly set the value in DB on change
-      f["required"] = f.reqd;
-      f["ref"] = f.fieldname;
-
-      f = getFieldInFormat(f, f);
-      f["visible"] = true;
-      return f;
-    });
+// LCS core rows in the order agreed with the team:
+// Kategorie, Priorität, Status, Gemeldet von, Kontakt, Gemeldet am,
+// Team, Bearbeiter. Priorität/Status/Team stay editable Link fields
+// (Status is set here in the sidebar, not the top-right header);
+// Kategorie/Gemeldet von/Kontakt/Gemeldet am are read-only info rows;
+// Bearbeiter is handled by the <AssignTo /> component below.
+const coreRows = computed(() => {
+  const doc = ticket.value?.doc || {};
+  const linkFields: Record<string, any> = {};
+  ["priority", "status", "agent_group"].forEach((n) => {
+    let f = getField(n);
+    if (!f) return;
+    f = parseField(f, doc);
+    // cant handle required depends on as we directly set the value in DB
+    f["required"] = f.reqd;
+    f["ref"] = f.fieldname;
+    f = getFieldInFormat(f, f);
+    f["visible"] = true;
+    linkFields[n] = f;
   });
-  return _coreFields;
+
+  const katMap: Record<string, string> = { Kunde: "Kundenanliegen" };
+  const kat = doc.custom_lcs_kategorie as string;
+
+  return [
+    { type: "info", key: "kategorie", label: "Kategorie", value: kat ? katMap[kat] || kat : "—" },
+    { type: "linkgroup", key: "prio-status", fields: [linkFields.priority, linkFields.status].filter(Boolean) },
+    { type: "info", key: "raised_by", label: "Gemeldet von", value: doc.raised_by || "—" },
+    { type: "info", key: "contact", label: "Kontakt", value: doc.contact || "—" },
+    { type: "info", key: "creation", label: "Gemeldet am", value: doc.creation ? formatDate(doc.creation) : "—" },
+    { type: "link", key: "agent_group", field: linkFields.agent_group || null },
+  ];
 });
 
 // "Weitere Details" per category — only the fields relevant to the
